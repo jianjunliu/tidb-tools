@@ -110,7 +110,7 @@ func (lm *LocalMeta) Save(pos mysql.Position, id string, gtid string, force bool
 		}
 
 		lm.saveTime = time.Now()
-		log.Infof("save position to file, binlog-name:%s binlog-pos:%d binlog-gtid:%v", lm.BinLogName, lm.BinLogPos, lm.BinlogGTID)
+		//log.Infof("save position to file, binlog-name:%s binlog-pos:%d binlog-gtid:%v", lm.BinLogName, lm.BinLogPos, lm.BinlogGTID)
 	}
 	return nil
 }

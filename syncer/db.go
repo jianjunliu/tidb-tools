@@ -455,20 +455,26 @@ func resolveDDLSQL(sql string) (sqls []string, ok bool, err error) {
 	return sqls, true, nil
 }
 
-func genDDLSQL(sql string, schema string) (string, error) {
+func genDDLSQL(sql string, schema string) ([]string, error) {
+
 	stmt, err := parser.New().ParseOneStmt(sql, "", "")
 	if err != nil {
-		return "", errors.Trace(err)
+		return nil, errors.Trace(err)
 	}
 	_, isCreateDatabase := stmt.(*ast.CreateDatabaseStmt)
 	if isCreateDatabase {
-		return fmt.Sprintf("%s;", sql), nil
+		return []string{fmt.Sprintf("%s;", sql)}, nil
 	}
 	if schema == "" {
-		return fmt.Sprintf("%s;", sql), nil
+		return []string{fmt.Sprintf("%s;", sql)}, nil
 	}
 
-	return fmt.Sprintf("USE `%s`; %s;", schema, sql), nil
+	var sqls []string
+	sqls = append(sqls, fmt.Sprintf("use `%s`;", schema))
+	sqls = append(sqls, sql)
+	//return fmt.Sprintf("USE `%s`; %s;", schema, sql), nil
+	//return fmt.Sprintf("%s;", sql), nil
+	return sqls, nil
 }
 
 func genTableName(schema string, table string) TableName {
@@ -634,7 +640,12 @@ LOOP:
 }
 
 func createDB(cfg DBConfig) (*sql.DB, error) {
-	dbDSN := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8&interpolateParams=true", cfg.User, cfg.Password, cfg.Host, cfg.Port)
+	var dbDSN string
+	if strings.Index(cfg.Host, ".") != -1 {
+		dbDSN = fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8&interpolateParams=true", cfg.User, cfg.Password, cfg.Host, cfg.Port)
+	} else {
+		dbDSN = fmt.Sprintf("%s:%s@tcp6(%s:%d)/?charset=utf8&interpolateParams=true", cfg.User, cfg.Password, cfg.Host, cfg.Port)
+	}
 	db, err := sql.Open("mysql", dbDSN)
 	if err != nil {
 		return nil, errors.Trace(err)

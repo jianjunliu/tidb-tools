@@ -37,7 +37,8 @@ var (
 	waitTime     = 10 * time.Millisecond
 	maxWaitTime  = 3 * time.Second
 	eventTimeout = 3 * time.Second
-	statusTime   = 30 * time.Second
+	//statusTime   = 30 * time.Second
+	statusTime = 200 * time.Millisecond
 )
 
 // Syncer can sync your MySQL data to another MySQL database.
@@ -651,6 +652,14 @@ func (s *Syncer) run() error {
 
 			log.Debugf("[query]%s", sql)
 
+			sql = strings.Trim(sql, " ")
+			if len(sql) == 0 {
+				continue
+			}
+			if sql[0] == '#' {
+				continue
+			}
+
 			lastPos := pos
 			pos.Pos = e.Header.LogPos
 			sqls, ok, err := resolveDDLSQL(sql)
@@ -675,21 +684,21 @@ func (s *Syncer) run() error {
 					continue
 				}
 
-				sql, err = genDDLSQL(sql, string(ev.Schema))
+				sqls, err = genDDLSQL(sql, string(ev.Schema))
 				if err != nil {
 					return errors.Trace(err)
 				}
 
-				log.Infof("[ddl][start]%s[pos]%v[next pos]%v[schema]%s", sql, lastPos, pos, string(ev.Schema))
+				log.Infof("[ddl][start]%s[pos]%v[next pos]%v[schema]%s", sqls, lastPos, pos, string(ev.Schema))
 
-				job := newJob(ddl, sql, nil, "", false, pos)
-				err = s.addJob(job)
-				if err != nil {
-					return errors.Trace(err)
+				for _, sql := range sqls {
+					job := newJob(ddl, sql, nil, "", false, pos)
+					err = s.addJob(job)
+					if err != nil {
+						return errors.Trace(err)
+					}
 				}
-
 				log.Infof("[ddl][end]%s[pos]%v[next pos]%v", sql, lastPos, pos)
-
 				s.clearTables()
 			}
 		case *replication.XIDEvent:
@@ -769,21 +778,33 @@ func (s *Syncer) printStatus() {
 		case <-s.ctx.Done():
 			return
 		case <-timer.C:
-			now := time.Now()
-			seconds := now.Unix() - s.lastTime.Unix()
-			totalSeconds := now.Unix() - s.start.Unix()
+			//now := time.Now()
+			//seconds := now.Unix() - s.lastTime.Unix()
+			//totalSeconds := now.Unix() - s.start.Unix()
 			last := s.lastCount.Get()
 			total := s.count.Get()
 
+			/**
 			tps, totalTps := int64(0), int64(0)
 			if seconds > 0 {
 				tps = (total - last) / seconds
 				totalTps = total / totalSeconds
 			}
+			*/
+			tps := int64(0)
+			/**
+			if seconds > 0 {
+				tps = (total - last) / seconds
+			} else {
+				tps = total - last
+			}*/
+			tps = (total - last) * int64(time.Second/statusTime)
 
-			log.Infof("[syncer]total events = %d, total tps = %d, recent tps = %d, %s.",
+			/**
+			log.Infof("[syncer]total events = %d, total tps = %d, recent tps = %d, %v.",
 				total, totalTps, tps, s.meta)
-
+			*/
+			log.Infof("=recentTps=%d=recentTps=%v=recentTps=", tps, s.meta.Pos())
 			s.lastCount.Set(total)
 			s.lastTime = time.Now()
 		}
